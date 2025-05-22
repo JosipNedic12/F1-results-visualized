@@ -29,7 +29,7 @@ export function initGlobe({
     // --- Draw Sphere (Ocean) ---
     svg.append("path")
         .attr("class", "sphere")
-        .attr("fill", "#aeefff")
+        .attr("fill", "#111")
         .attr("d", path({ type: "Sphere" }));
 
     // --- Draw Graticule (Grid) ---
@@ -37,7 +37,7 @@ export function initGlobe({
     svg.append("path")
         .attr("class", "graticule")
         .attr("fill", "none")
-        .attr("stroke", "#ccc")
+        .attr("stroke", "#555")
         .attr("stroke-width", 0.5)
         .attr("opacity", 0.5)
         .attr("d", path(graticule));
@@ -48,7 +48,7 @@ export function initGlobe({
         .data(geojson.features)
         .join("path")
         .attr("class", "land")
-        .attr("fill", "#2ecc40")
+        .attr("fill", "#000")
         .attr("stroke", "#fff")
         .attr("stroke-width", 0.5)
         .attr("d", path);
@@ -63,7 +63,7 @@ export function initGlobe({
         .data(circuits)
         .join("circle")
         .attr("class", "circuit-dot")
-        .attr("fill", "red")
+        .attr("fill", "var(--volcano-red)")
         .attr("stroke", "white")
         .attr("stroke-width", 0.7)
         .attr("r", 4)
@@ -91,12 +91,33 @@ export function initGlobe({
             if (typeof onCircuitSelected === "function") {
                 onCircuitSelected(d.circuitId);
             }
-            // Optional: highlight selected dot
+
+            // Highlight selected dot
             circuitDots.attr("fill", c =>
-                c.circuitId === d.circuitId ? "#C83E4D" : "red"
+                c.circuitId === d.circuitId ? "var(--am-green)" : "var(--volcano-red)"
             );
+
+            // --- Center and Zoom ---
+            const targetCoords = [+d.lng, +d.lat];
+            const rotate = [-targetCoords[0], -targetCoords[1]]; // center target
+
+            d3.transition()
+                .duration(1000)
+                .tween("rotate", () => {
+                    const r = d3.interpolate(projection.rotate(), rotate);
+                    const currentScale = projection.scale();
+                    const s = d3.interpolate(currentScale, currentScale);
+
+                    return function (t) {
+                        projection.rotate(r(t)).scale(s(t));
+                        svg.select("path.sphere").attr("d", path({ type: "Sphere" }));
+                        svg.select("path.graticule").attr("d", path(graticule));
+                        svg.selectAll("path.land").attr("d", path);
+                        updateCircuits();
+                    };
+                });
         });
-        updateCircuits();
+    updateCircuits();
 
 
     // --- Helper: Update Dot Positions (for drag/zoom/resize) ---
@@ -154,10 +175,8 @@ export function initGlobe({
         updateCircuits();
     }
 
-    // Listen for window resize (optional)
     window.addEventListener('resize', resizeGlobe);
 
-    // --- Return API for external control ---
     return {
         resize: resizeGlobe
     };

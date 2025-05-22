@@ -1,12 +1,13 @@
+// barChart.js
 import { getColorMap } from './utils.js';
 
-export function initDriverBarChart({ circuits, drivers, results, colors, races, constructors }) {
+export function initBarChart({ circuits, constructors, results, colors, races }) {
+    // Prepare color map for constructors
     const colorMap = getColorMap(colors);
 
-    // Build lookup maps
-    const driverMap = Object.fromEntries(drivers.map(d => [d.driverId, d]));
-    const circuitMap = Object.fromEntries(circuits.map(d => [d.circuitId, d]));
+    // Build lookup maps for quick access
     const constructorMap = Object.fromEntries(constructors.map(d => [d.constructorId, d]));
+    const circuitMap = Object.fromEntries(circuits.map(d => [d.circuitId, d]));
 
     // Build a mapping from raceId to circuitId
     const raceToCircuit = {};
@@ -14,37 +15,33 @@ export function initDriverBarChart({ circuits, drivers, results, colors, races, 
         raceToCircuit[race.raceId] = race.circuitId;
     });
 
-    // Aggregate: circuitId -> driverId -> { points, constructorId }
-    const pointsByCircuitDriver = {};
+    // Aggregate points by circuit and constructor
+    const pointsByCircuit = {};
     results.forEach(result => {
         const circuitId = raceToCircuit[result.raceId];
-        const driverId = result.driverId;
         const constructorId = result.constructorId;
         const points = +result.points;
-        if (!circuitId || !driverId) return;
-        if (!pointsByCircuitDriver[circuitId]) pointsByCircuitDriver[circuitId] = {};
-        if (!pointsByCircuitDriver[circuitId][driverId]) {
-            pointsByCircuitDriver[circuitId][driverId] = { points: 0, constructorId: constructorId };
-        }
-        pointsByCircuitDriver[circuitId][driverId].points += points;
-        // Always use the latest constructorId found for this driver at this circuit
-        pointsByCircuitDriver[circuitId][driverId].constructorId = constructorId;
+        if (!circuitId) return; // skip if mapping missing
+        if (!pointsByCircuit[circuitId]) pointsByCircuit[circuitId] = {};
+        if (!pointsByCircuit[circuitId][constructorId]) pointsByCircuit[circuitId][constructorId] = 0;
+        pointsByCircuit[circuitId][constructorId] += points;
     });
 
+
     // Chart sizing and margins
-    const margin = { top: 40, right: 30, bottom: 80, left: 60 };
-    let chartWidth = 700, chartHeight = 310;
+    const margin = { top: 40, right: 30, bottom: 80, left: 80 };
+    let chartWidth = 700, chartHeight = 320;
 
     // Create SVG if not already present
-    let svg = d3.select("#bottom-right").select("svg#driver-chart-svg");
+    let svg = d3.select("#top-right").select("svg#chart-svg");
     if (svg.empty()) {
-        svg = d3.select("#bottom-right")
+        svg = d3.select("#top-right")
             .append("svg")
-            .attr("id", "driver-chart-svg")
+            .attr("id", "chart-svg")
             .attr("width", chartWidth)
             .attr("height", chartHeight);
     }
-    svg.selectAll("*").remove();
+    svg.selectAll("*").remove(); // Clean for fresh drawing
 
     const g = svg.append("g").attr("transform", `translate(${margin.left},${margin.top})`);
     const innerWidth = chartWidth - margin.left - margin.right;
@@ -61,7 +58,8 @@ export function initDriverBarChart({ circuits, drivers, results, colors, races, 
         .attr("y", -15)
         .attr("text-anchor", "middle")
         .attr("font-size", "22px")
-        .attr("font-weight", "bold");
+        .attr("font-weight", "bold")
+        .text("");
 
     // Y label
     g.append("text")
@@ -69,7 +67,7 @@ export function initDriverBarChart({ circuits, drivers, results, colors, races, 
         .attr("text-anchor", "middle")
         .attr("transform", `translate(${-40},${innerHeight / 2})rotate(-90)`)
         .attr("font-size", "14px")
-        .attr("font-weight","bold")
+        .attr("font-weight", "bold")
         .text("Points");
 
     // X label
@@ -77,14 +75,16 @@ export function initDriverBarChart({ circuits, drivers, results, colors, races, 
         .attr("class", "x-label")
         .attr("text-anchor", "middle")
         .attr("x", innerWidth / 2)
-        .attr("y", innerHeight + 70)
+        .attr("y", innerHeight + 60)
         .attr("font-size", "14px")
-        .attr("font-weight","bold")
-        .text("Driver");
+        .attr("font-weight", "bold")
+        .text("Constructor");
+
 
     // Update function to redraw chart for a given circuit
     function update(circuitId) {
-        if (!pointsByCircuitDriver[circuitId]) {
+        // Defensive: clear chart if circuitId invalid
+        if (!pointsByCircuit[circuitId]) {
             g.selectAll(".bar,.label").remove();
             title.text("No data for this circuit");
             return;
@@ -93,15 +93,12 @@ export function initDriverBarChart({ circuits, drivers, results, colors, races, 
         const circuit = circuitMap[circuitId];
         const circuitName = circuit ? circuit.name : "Unknown Circuit";
 
-        // Prepare data: top 10 drivers by points
-        const data = Object.entries(pointsByCircuitDriver[circuitId])
-            .map(([driverId, { points, constructorId }]) => ({
-                driverId,
-                name: driverMap[driverId]
-                    ? `${driverMap[driverId].forename} ${driverMap[driverId].surname}`
-                    : driverId,
-                points,
-                constructorId
+        // Prepare data: top 10 constructors by points
+        const data = Object.entries(pointsByCircuit[circuitId])
+            .map(([constructorId, points]) => ({
+                constructorId,
+                name: constructorMap[constructorId]?.name || constructorId,
+                points
             }))
             .filter(d => d.points > 0)
             .sort((a, b) => d3.descending(a.points, b.points))
@@ -184,9 +181,10 @@ export function initDriverBarChart({ circuits, drivers, results, colors, races, 
             .remove();
 
         // Title
-        title.text(`Top Drivers at ${circuitName}`);
+        title.text(`Top Constructors at ${circuitName}`);
     }
 
     // Expose the update function for external calls
-    initDriverBarChart.update = update;
+    initBarChart.update = update;
 }
+

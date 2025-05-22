@@ -95,16 +95,18 @@ export function initLapChart({ circuits, results, races, drivers }) {
         .x(d => x(d.year))
         .y(d => y(d.lap));
 
+        
     // --- Path for line ---
     const path = g.append("path")
         .attr("fill", "none")
-        .attr("stroke", "#0000ff")
-        .attr("stroke-width", 2);
+        .attr("stroke", "var(--am-green)")
+        .attr("stroke-width", 4);
+
 
     // --- Marker for selected year ---
     const marker = g.append("circle")
         .attr("r", 6)
-        .attr("fill", "#f00")
+        .attr("fill", "var(--volcano-red)")
         .attr("stroke", "#fff")
         .attr("stroke-width", 2)
         .style("pointer-events", "all");

@@ -4,6 +4,10 @@
   font-weight: normal;
   font-style: normal;
 }
+:root {
+  --volcano-red: #9d311e; 
+  --am-green: #037A68;
+}
 
 html, body {
   height: 100%;
@@ -80,7 +84,7 @@ nav {
 }
 #navbar a.active,
 #navbar a:hover {
-  background: #C83E4D;
+  background: var(--volcano-red);
   color: #fff;
 }
 
@@ -162,6 +166,9 @@ svg text {
 #top-right .bar:hover, #bottom-right .bar:hover {
   fill: #2ecc40;
 }
+#year-slider {
+    accent-color: var(--am-green); /* Modern way in supported browsers */
+  }
 body {
   font-family: 'F1Font', Arial, Helvetica, sans-serif;
 }
