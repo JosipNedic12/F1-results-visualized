@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<title>F1 Globe Dashboard</title>
+<style>
+  html,
+  body {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+  }
+
+  body {
+    width: 100vw;
+    height: 100vh;
+    box-sizing: border-box;
+    overflow: hidden;
+  }
+
+  .container {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 1fr 1fr;
+    width: 100vw;
+    height: 100vh;
+  }
+
+  .quadrant {
+    border: 1px solid #222;
+    box-sizing: border-box;
+    position: relative;
+    overflow: hidden;
+  }
+
+  #globe-section {
+    background: #222;
+  }
+
+  /* Tooltip styling */
+  #tooltip {
+    position: absolute;
+    pointer-events: none;
+    background: rgba(0, 0, 0, 0.85);
+    color: #fff;
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 15px;
+    font-family: sans-serif;
+    display: none;
+    z-index: 10;
+  }
+
+  #top-right svg text {
+    font-family: sans-serif;
+  }
+
+  #top-right .bar {
+    transition: fill 0.2s;
+  }
+
+  #top-right .bar:hover {
+    fill: #2ecc40;
+  }
+</style>
+
+<body>
+  <div id="tooltip"></div>
+  <div class="container">
+    <div class="quadrant" id="globe-section">
+      <svg id="globe-svg" width="100%" height="100%"></svg>
+    </div>
+    <div class="quadrant" id="top-right"></div>
+    <div class="quadrant" id="bottom-left">
+      <div id="bottom-left-content" style="padding: 16px;">
+        <h2 style="margin-top:0;margin-bottom:12px;">Lap times by year</h2>
+        <label for="year-slider">Year: <span id="year-value">2000</span></label>
+        <input type="range" id="year-slider" min="2000" max="2024" value="2000" step="1" style="width: 60%;">
+        <svg id="fastest-lap-chart" width="500" height="300"></svg>
+      </div>
+    </div>
+
+  </div>
+  <div class="quadrant" id="bottom-right"></div>
+  </div>
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <script>
+    // Load all needed data in one Promise
+    Promise.all([
+      d3.json("custom.geo.json"),
+      d3.csv("F1_dataset/circuits.csv"),
+      d3.csv("F1_dataset/constructors.csv"),
+      d3.csv("F1_dataset/races.csv"),
+      d3.csv("F1_dataset/results.csv"),
+      d3.csv("F1_dataset/constructor_colors.csv"),
+      d3.csv("F1_dataset/drivers.csv")
+    ]).then(function ([geojson, circuits, constructors, races, results, colors, drivers]) {
+      // --- Globe Setup (top left) ---
+      function getGlobeSize() {
+        const container = document.getElementById('globe-section');
+        return {
+          width: container.clientWidth,
+          height: container.clientHeight
+        };
+      }
+      let { width, height } = getGlobeSize();
+      const svg = d3.select("#globe-svg")
+        .attr("width", width)
+        .attr("height", height);
+
+      const projection = d3.geoOrthographic()
+        .scale(Math.min(width, height) / 2.1)
+        .translate([width / 2, height / 2]);
+      const path = d3.geoPath().projection(projection);
+
+      svg.append("path")
+        .attr("class", "sphere")
+        .attr("fill", "#aeefff")
+        .attr("d", path({ type: "Sphere" }));
+
+      const graticule = d3.geoGraticule10();
+      svg.append("path")
+        .attr("class", "graticule")
+        .attr("fill", "none")
+        .attr("stroke", "#ccc")
+        .attr("stroke-width", 0.5)
+        .attr("opacity", 0.5)
+        .attr("d", path(graticule));
+
+      // Helper maps
+      const circuitMap = Object.fromEntries(circuits.map(d => [d.circuitId, d]));
+      const constructorMap = Object.fromEntries(constructors.map(d => [d.constructorId, d]));
+      const raceToCircuit = Object.fromEntries(races.map(d => [d.raceId, d.circuitId]));
+
+
+      const driverMap = {};
+      drivers.forEach(d => {
+        driverMap[d.driverId] = { forename: d.forename, surname: d.surname };
+      });
+      // Color map
+      const colorMap = {};
+      colors.forEach(d => { colorMap[String(d.constructorId)] = d.color; });
+
+      // --- Aggregate: circuitId -> constructorId -> total points
+      const pointsByCircuit = {};
+      results.forEach(r => {
+        const raceId = r.raceId;
+        const circuitId = raceToCircuit[raceId];
+        const constructorId = r.constructorId;
+        const points = +r.points;
+        if (!pointsByCircuit[circuitId]) pointsByCircuit[circuitId] = {};
+        if (!pointsByCircuit[circuitId][constructorId]) pointsByCircuit[circuitId][constructorId] = 0;
+        pointsByCircuit[circuitId][constructorId] += points;
+      });
+
+      // --- Fastest Lap Data Preparation ---
+      const raceIdToYear = {};
+      const raceIdToCircuit = {};
+      races.forEach(r => {
+        raceIdToYear[r.raceId] = +r.year;
+        raceIdToCircuit[r.raceId] = r.circuitId;
+      });
+
+      function timeToSeconds(timeStr) {
+        if (!timeStr || !timeStr.includes(":")) return null;
+        const [min, sec] = timeStr.split(":");
+        return parseInt(min) * 60 + parseFloat(sec);
+      }
+
+      function formatLapTime(sec) {
+        if (sec == null || isNaN(sec)) return "N/A";
+        const minutes = Math.floor(sec / 60);
+        const seconds = Math.floor(sec % 60);
+        const milliseconds = Math.round((sec - Math.floor(sec)) * 1000);
+        return `${minutes}:${seconds.toString().padStart(2, '0')}.${milliseconds.toString().padStart(3, '0')}`;
+      }
+
+      const fastestLapByCircuitYear = {};
+      results.forEach(res => {
+        const raceId = res.raceId;
+        const year = raceIdToYear[raceId];
+        const circuitId = raceIdToCircuit[raceId];
+        const lapTime = timeToSeconds(res.fastestLapTime);
+        const driverId = res.driverId;
+        if (!year || !circuitId || !lapTime) return;
+        if (!fastestLapByCircuitYear[circuitId]) fastestLapByCircuitYear[circuitId] = {};
+        // If this is the fastest so far, store both lap and driverId
+        if (
+          !fastestLapByCircuitYear[circuitId][year] ||
+          lapTime < fastestLapByCircuitYear[circuitId][year].lap
+        ) {
+          fastestLapByCircuitYear[circuitId][year] = { lap: lapTime, driverId: driverId };
+        }
+      });
+
+
+      // --- Draw Land ---
+      svg.append("g")
+        .selectAll("path")
+        .data(geojson.features)
+        .join("path")
+        .attr("class", "land")
+        .attr("fill", "#2ecc40")
+        .attr("stroke", "#fff")
+        .attr("stroke-width", 0.5)
+        .attr("d", path);
+
+      // --- Draw Circuit Dots ---
+      let circuitDots = svg.append("g")
+        .attr("class", "circuits-group")
+        .selectAll("circle")
+        .data(circuits)
+        .join("circle")
+        .attr("class", "circuit-dot")
+        .attr("fill", "red")
+        .attr("stroke", "white")
+        .attr("stroke-width", 0.7)
+        .attr("r", 4)
+        .attr("transform", function (d) {
+          const coords = projection([+d.lng, +d.lat]);
+          if (!coords) return "scale(0)";
+          return "translate(" + coords[0] + "," + coords[1] + ")";
+        })
+        .on("mouseover", function (event, d) {
+          d3.select("#tooltip")
+            .style("display", "block")
+            .html(
+              `<strong>${d.name}</strong><br>${d.location}, ${d.country}<br><em>Click for top constructors & fastest laps</em>`
+            );
+        })
+        .on("mousemove", function (event) {
+          d3.select("#tooltip")
+            .style("left", (event.pageX + 15) + "px")
+            .style("top", (event.pageY - 28) + "px");
+        })
+        .on("mouseout", function () {
+          d3.select("#tooltip").style("display", "none");
+        })
+        .on("click", function (event, d) {
+          selectedCircuitRef = d.circuitRef;
+          updateBarChart(selectedCircuitRef);
+          onCircuitClick(d.circuitId);
+          circuitDots.attr("fill", c => c.circuitRef === selectedCircuitRef ? "#C83E4D" : "red");
+        });
+
+      function updateCircuits(circuits) {
+        if (!circuits) return;
+        circuits.attr("transform", function (d) {
+          const coords = projection([+d.lng, +d.lat]);
+          if (!coords || d3.geoDistance([+d.lng, +d.lat], projection.invert([width / 2, height / 2])) > Math.PI / 2) {
+            return "scale(0)";
+          }
+          return "translate(" + coords[0] + "," + coords[1] + ")";
+        });
+      }
+
+      svg.call(d3.drag()
+        .on("drag", (event) => {
+          const rotate = projection.rotate();
+          const k = 1 / projection.scale();
+          projection.rotate([
+            rotate[0] + event.dx * k * 150,
+            rotate[1] - event.dy * k * 150
+          ]);
+          svg.select("path.sphere").attr("d", path({ type: "Sphere" }));
+          svg.select("path.graticule").attr("d", path(graticule));
+          svg.selectAll("path.land").attr("d", path);
+          updateCircuits(circuitDots);
+        })
+      );
+
+      svg.call(
+        d3.zoom()
+          .scaleExtent([0.5, 8])
+          .on("zoom", (event) => {
+            projection.scale(Math.min(width, height) / 2.1 * event.transform.k);
+            svg.select("path.sphere").attr("d", path({ type: "Sphere" }));
+            svg.select("path.graticule").attr("d", path(graticule));
+            svg.selectAll("path.land").attr("d", path);
+            updateCircuits(circuitDots);
+          })
+      );
+
+      window.addEventListener('resize', () => {
+        const newSize = getGlobeSize();
+        width = newSize.width;
+        height = newSize.height;
+        svg.attr("width", width).attr("height", height);
+        projection
+          .scale(Math.min(width, height) / 2.1)
+          .translate([width / 2, height / 2]);
+        svg.select("path.sphere").attr("d", path({ type: "Sphere" }));
+        svg.select("path.graticule").attr("d", path(graticule));
+        svg.selectAll("path.land").attr("d", path);
+        updateCircuits(circuitDots);
+      });
+
+      // --- Top Right Bar Chart ---
+      function updateBarChart(circuitRef) {
+        d3.select("#top-right").selectAll("*").remove();
+        const selectedCircuit = circuits.find(d => d.circuitRef === circuitRef);
+        if (!selectedCircuit) {
+          d3.select("#top-right").append("div").text("Circuit not found.");
+          return;
+        }
+        const circuitId = selectedCircuit.circuitId;
+        const circuitName = selectedCircuit.name;
+
+        // Get top 10 constructors for this circuit, stop at first 0
+        const sortedConstructors = Object.entries(pointsByCircuit[circuitId] || {})
+          .map(([constructorId, totalPoints]) => ({
+            constructorId: String(constructorId),
+            name: constructorMap[constructorId]?.name || constructorId,
+            points: totalPoints
+          }))
+          .sort((a, b) => d3.descending(a.points, b.points));
+        const topConstructors = [];
+        for (const c of sortedConstructors) {
+          if (topConstructors.length >= 10) break;
+          if (c.points === 0) break;
+          topConstructors.push(c);
+        }
+
+        const chartMargin = { top: 40, right: 30, bottom: 80, left: 60 };
+        const chartContainer = document.getElementById('top-right');
+        const chartWidth = chartContainer.clientWidth - chartMargin.left - chartMargin.right;
+        const chartHeight = chartContainer.clientHeight - chartMargin.top - chartMargin.bottom;
+
+        const svgId = "chart-svg";
+        let chartSvg = d3.select("#top-right").select("svg#" + svgId);
+        if (chartSvg.empty()) {
+          chartSvg = d3.select("#top-right")
+            .append("svg")
+            .attr("id", svgId)
+            .attr("width", chartContainer.clientWidth)
+            .attr("height", chartContainer.clientHeight)
+            .append("g")
+            .attr("transform", `translate(${chartMargin.left},${chartMargin.top})`);
+        } else {
+          chartSvg = chartSvg.select("g");
+        }
+
+        const x = d3.scaleBand()
+          .domain(topConstructors.map(d => d.name))
+          .range([0, chartWidth])
+          .padding(0.2);
+
+        const y = d3.scaleLinear()
+          .domain([0, d3.max(topConstructors, d => d.points) || 1])
+          .range([chartHeight, 0]);
+
+        let xAxis = chartSvg.selectAll(".x-axis").data([null]);
+        xAxis = xAxis.enter()
+          .append("g")
+          .attr("class", "x-axis")
+          .attr("transform", `translate(0,${chartHeight})`)
+          .merge(xAxis);
+
+        xAxis.transition()
+          .duration(750)
+          .call(d3.axisBottom(x))
+          .selectAll("text")
+          .attr("transform", "rotate(-30)")
+          .style("text-anchor", "end");
+
+        let yAxis = chartSvg.selectAll(".y-axis").data([null]);
+        yAxis = yAxis.enter()
+          .append("g")
+          .attr("class", "y-axis")
+          .merge(yAxis);
+
+        yAxis.transition()
+          .duration(750)
+          .call(d3.axisLeft(y));
+
+        let bars = chartSvg.selectAll(".bar")
+          .data(topConstructors, d => d.name);
+
+        bars.enter()
+          .append("rect")
+          .attr("class", "bar")
+          .attr("x", d => x(d.name))
+          .attr("width", x.bandwidth())
+          .attr("y", chartHeight)
+          .attr("height", 0)
+          .attr("fill", d => colorMap[d.constructorId] || "#C83E4D")
+          .merge(bars)
+          .transition()
+          .duration(1000)
+          .attr("x", d => x(d.name))
+          .attr("width", x.bandwidth())
+          .attr("y", d => y(d.points))
+          .attr("height", d => chartHeight - y(d.points))
+          .attr("fill", d => colorMap[d.constructorId] || "#C83E4D");
+
+        bars.exit()
+          .transition()
+          .duration(500)
+          .attr("y", chartHeight)
+          .attr("height", 0)
+          .remove();
+
+        let labels = chartSvg.selectAll(".label")
+          .data(topConstructors, d => d.name);
+
+        labels.enter()
+          .append("text")
+          .attr("class", "label")
+          .attr("x", d => x(d.name) + x.bandwidth() / 2)
+          .attr("y", chartHeight)
+          .attr("text-anchor", "middle")
+          .attr("fill", "#222")
+          .attr("font-size", "14px")
+          .text(d => Math.round(d.points))
+          .merge(labels)
+          .transition()
+          .duration(1000)
+          .attr("x", d => x(d.name) + x.bandwidth() / 2)
+          .attr("y", d => y(d.points) - 5)
+          .text(d => Math.round(d.points));
+
+        labels.exit()
+          .transition()
+          .duration(500)
+          .attr("y", chartHeight)
+          .remove();
+
+        let title = chartSvg.selectAll(".chart-title").data([null]);
+        title = title.enter()
+          .append("text")
+          .attr("class", "chart-title")
+          .attr("x", chartWidth / 2)
+          .attr("y", -15)
+          .attr("text-anchor", "middle")
+          .attr("font-size", "18px")
+          .attr("font-weight", "bold")
+          .merge(title);
+        title.text(`Top 10 Constructors at ${circuitName}`);
+
+        let yLabel = chartSvg.selectAll(".y-label").data([null]);
+        yLabel = yLabel.enter()
+          .append("text")
+          .attr("class", "y-label")
+          .attr("text-anchor", "middle")
+          .attr("transform", `translate(${-40},${chartHeight / 2})rotate(-90)`)
+          .attr("font-size", "14px")
+          .merge(yLabel);
+        yLabel.text("Points");
+
+        let xLabel = chartSvg.selectAll(".x-label").data([null]);
+        xLabel = xLabel.enter()
+          .append("text")
+          .attr("class", "x-label")
+          .attr("text-anchor", "middle")
+          .attr("x", chartWidth / 2)
+          .attr("y", chartHeight + 60)
+          .attr("font-size", "14px")
+          .merge(xLabel);
+        xLabel.text("Constructor");
+      }
+
+      // --- Bottom Left: Fastest Lap Graph ---
+      const svgWidthLap = 500, svgHeightLap = 300;
+      const marginLap = { top: 30, right: 30, bottom: 40, left: 60 };
+      const widthLap = svgWidthLap - marginLap.left - marginLap.right;
+      const heightLap = svgHeightLap - marginLap.top - marginLap.bottom;
+      const svgLap = d3.select("#fastest-lap-chart")
+        .attr("width", svgWidthLap)
+        .attr("height", svgHeightLap);
+      const gLap = svgLap.append("g").attr("transform", `translate(${marginLap.left},${marginLap.top})`);
+      const xLap = d3.scaleLinear().domain([2000, 2024]).range([0, widthLap]);
+      const yLap = d3.scaleLinear().range([heightLap, 0]);
+      const noDataText = gLap.append("text")
+        .attr("class", "no-data-text")
+        .attr("x", widthLap / 2)
+        .attr("y", heightLap / 2)
+        .attr("text-anchor", "middle")
+        .attr("font-size", "22px")
+        .attr("fill", "#999")
+        .style("display", "none")
+        .text("No lap data");
+
+      gLap.append("g")
+        .attr("class", "x-axis")
+        .attr("transform", `translate(0,${heightLap})`)
+        .call(d3.axisBottom(xLap).tickFormat(d3.format("d")));
+
+      gLap.append("g")
+        .attr("class", "y-axis");
+
+      const lineLap = d3.line()
+        .x(d => xLap(d.year))
+        .y(d => yLap(d.lap));
+
+      const pathLap = gLap.append("path")
+        .attr("fill", "none")
+        .attr("stroke", "#C83E4D")
+        .attr("stroke-width", 2);
+
+      const markerLap = gLap.append("circle")
+        .attr("r", 6)
+        .attr("fill", "#2ecc40")
+        .attr("stroke", "#222")
+        .attr("stroke-width", 2)
+        .style("pointer-events", "all")
+        .on("mouseover", function (event, d) {
+          if (!markerLap.datum()) return;
+          const driverId = markerLap.datum().driverId;
+          const lapTime = markerLap.datum().lap;
+          const driver = driverMap[driverId];
+          const name = driver ? `${driver.forename} ${driver.surname}` : "Unknown";
+          const formattedLap = formatLapTime(lapTime);
+          d3.select("#tooltip")
+            .style("display", "block")
+            .html(`<strong>Fastest Lap by:</strong><br>${name}<br><strong>Lap Time:</strong> ${formattedLap}`);
+        })
+        .on("mousemove", function (event) {
+          d3.select("#tooltip")
+            .style("left", (event.pageX + 15) + "px")
+            .style("top", (event.pageY - 28) + "px");
+        })
+        .on("mouseout", function () {
+          d3.select("#tooltip").style("display", "none");
+        });
+
+
+      function updateLapGraph(circuitId, selectedYear = 2000) {
+        const data = [];
+        for (let year = 2000; year <= 2024; year++) {
+          if (fastestLapByCircuitYear[circuitId] && fastestLapByCircuitYear[circuitId][year]) {
+            data.push({
+              year,
+              lap: fastestLapByCircuitYear[circuitId][year].lap,
+              driverId: fastestLapByCircuitYear[circuitId][year].driverId
+            });
+          }
+        }
+
+        if (data.length === 0) {
+          pathLap.attr("d", null);
+          markerLap.style("display", "none");
+          gLap.select(".y-axis").call(d3.axisLeft(yLap).ticks(5));
+          noDataText.style("display", null); // Show the message
+          return;
+        } else {
+          noDataText.style("display", "none"); // Hide the message
+        }
+
+
+        yLap.domain([
+          d3.min(data, d => d.lap) * 0.98,
+          d3.max(data, d => d.lap) * 1.02
+        ]);
+
+        gLap.select(".y-axis")
+          .transition().duration(500)
+          .call(d3.axisLeft(yLap).tickFormat(d => {
+            const m = Math.floor(d / 60);
+            const s = (d % 60).toFixed(3).padStart(6, "0");
+            return `${m}:${s}`;
+          }));
+
+        pathLap
+          .datum(data)
+          .transition().duration(500)
+          .attr("d", lineLap);
+
+        const yearData = data.find(d => d.year === selectedYear);
+        if (yearData) {
+          markerLap
+            .datum(yearData) // Attach the current year's data to the marker
+            .transition().duration(300)
+            .attr("cx", xLap(yearData.year))
+            .attr("cy", yLap(yearData.lap))
+            .style("display", null);
+        } else {
+          markerLap.style("display", "none");
+        }
+
+      }
+
+      // --- Slider event ---
+      const slider = document.getElementById("year-slider");
+      const yearValue = document.getElementById("year-value");
+      let currentCircuitId = circuits[0].circuitId;
+
+      slider.addEventListener("input", function () {
+        const year = +this.value;
+        yearValue.textContent = year;
+        if (currentCircuitId) updateLapGraph(currentCircuitId, year);
+      });
+
+      function onCircuitClick(circuitId) {
+        currentCircuitId = circuitId;
+        const year = +slider.value;
+        updateLapGraph(circuitId, year);
+      }
+
+      // --- Initialize with first circuit ---
+      let selectedCircuitRef = circuits[0].circuitRef;
+      updateBarChart(selectedCircuitRef);
+      updateLapGraph(currentCircuitId, +slider.value);
+    });
+  </script>
+</body>

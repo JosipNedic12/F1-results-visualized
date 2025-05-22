@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>F1 Globe Dashboard</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div id="loading-overlay">
+    <div class="loader-text">Loading F1 Globe...</div>
+  </div>
+  <div id="site-header">
+    <h1>Formula 1 results visualized</h1>
+    <nav>
+      <ul id="navbar">
+        <li><a href="#" data-page="home" class="active">Homepage</a></li>
+        <li><a href="#" data-page="compare">Compare Drivers</a></li>
+      </ul>
+    </nav>
+  </div>
+  <div class="container" id="page-home">
+    <div class="quadrant" id="globe-section">
+      <svg id="globe-svg" width="100%" height="100%"></svg>
+    </div>
+    <div class="quadrant" id="top-right"></div>
+    <div class="quadrant" id="bottom-left">
+      <div id="bottom-left-content" style="padding: 16px;">
+        <div class="slider-row" style="margin-bottom: 14px;">
+          <label for="year-slider">Year: <span id="year-value">2000</span></label>
+          <input type="range" id="year-slider" min="2000" max="2024" value="2000" step="1" style="width: 60%;">
+        </div>
+        <svg id="fastest-lap-chart" width="500" height="300"></svg>
+      </div>
+    </div>
+    <div class="quadrant" id="bottom-right"></div>
+  </div>
+  <div class="container" id="page-compare" style="display:none;">
+    <div style="padding:2em;text-align:center;">
+      <h2>Compare Drivers</h2>
+      <p>Coming soon: Interactive driver comparison dashboard.</p>
+    </div>
+  </div>
+  <div id="tooltip"></div>
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <script type="module" src="main.js"></script>
+  <script>
+    // Simple SPA navigation
+    document.querySelectorAll('#navbar a').forEach(link => {
+      link.addEventListener('click', function(e) {
+        e.preventDefault();
+        document.querySelectorAll('#navbar a').forEach(l => l.classList.remove('active'));
+        this.classList.add('active');
+        document.getElementById('page-home').style.display = this.dataset.page === 'home' ? '' : 'none';
+        document.getElementById('page-compare').style.display = this.dataset.page === 'compare' ? '' : 'none';
+      });
+    });
+  </script>
+</body>
+</html>
