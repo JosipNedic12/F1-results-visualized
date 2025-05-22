@@ -1,10 +1,12 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="utf-8">
   <title>F1 Globe Dashboard</title>
   <link rel="stylesheet" href="styles.css">
 </head>
+
 <body>
   <div id="loading-overlay">
     <div class="loader-text">Loading F1 Globe...</div>
@@ -13,8 +15,9 @@
     <h1>Formula 1 results visualized</h1>
     <nav>
       <ul id="navbar">
-        <li><a href="#" data-page="home" class="active">Homepage</a></li>
-        <li><a href="#" data-page="compare">Compare Drivers</a></li>
+        <li><a href="index.html" class="active">Homepage</a></li>
+        <li><a href="compare.html">Compare Drivers</a></li>
+      </ul>
       </ul>
     </nav>
   </div>
@@ -34,26 +37,17 @@
     </div>
     <div class="quadrant" id="bottom-right"></div>
   </div>
-  <div class="container" id="page-compare" style="display:none;">
-    <div style="padding:2em;text-align:center;">
-      <h2>Compare Drivers</h2>
-      <p>Coming soon: Interactive driver comparison dashboard.</p>
-    </div>
   </div>
   <div id="tooltip"></div>
   <script src="https://d3js.org/d3.v7.min.js"></script>
   <script type="module" src="JavaScript/main.js"></script>
   <script>
-    // Simple SPA navigation
-    document.querySelectorAll('#navbar a').forEach(link => {
-      link.addEventListener('click', function(e) {
-        e.preventDefault();
-        document.querySelectorAll('#navbar a').forEach(l => l.classList.remove('active'));
-        this.classList.add('active');
-        document.getElementById('page-home').style.display = this.dataset.page === 'home' ? '' : 'none';
-        document.getElementById('page-compare').style.display = this.dataset.page === 'compare' ? '' : 'none';
-      });
-    });
-  </script>
+  document.querySelectorAll('#navbar a').forEach(link => {
+    if (window.location.pathname.endsWith(link.getAttribute('href'))) {
+      link.classList.add('active');
+    }
+  });
+</script>
 </body>
+
 </html>

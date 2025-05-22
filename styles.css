@@ -4,6 +4,7 @@
   font-weight: normal;
   font-style: normal;
 }
+
 :root {
   --volcano-red: #9d311e; 
   --am-green: #037A68;
@@ -23,6 +24,7 @@ body {
   box-sizing: border-box;
   overflow: hidden;
   color: #fff;
+  font-family: 'F1Font', Arial, Helvetica, sans-serif;
 }
 
 #loading-overlay {
@@ -52,7 +54,7 @@ body {
   position: relative;
   z-index: 20;
   flex: 0 0 auto;
-  background-image: url("images/carbonBG.jpg")
+  background-image: url("images/carbonBG.jpg");
 }
 #site-header h1 {
   margin: 0;
@@ -88,6 +90,7 @@ nav {
   color: #fff;
 }
 
+/* Main grid container for home page */
 .container {
   flex: 1 1 auto;
   display: grid;
@@ -167,12 +170,10 @@ svg text {
   fill: #2ecc40;
 }
 #year-slider {
-    accent-color: var(--am-green); /* Modern way in supported browsers */
-  }
-body {
-  font-family: 'F1Font', Arial, Helvetica, sans-serif;
+    accent-color: var(--am-green);
 }
 
+/* F1 font for headings */
 h1, h2, h3, h4, h5, h6 {
   font-family: 'F1Font', Arial, Helvetica, sans-serif;
 }
@@ -184,4 +185,11 @@ svg .chart-title {
   fill: #fff !important;                
   font-family: 'F1Font', Arial, Helvetica, sans-serif!important; 
   font-size: 12px;                     
+}
+
+@media (max-width: 900px) {
+  .container {
+    grid-template-columns: 1fr;
+    grid-template-rows: repeat(4, 1fr);
+  }
 }

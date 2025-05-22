@@ -1,0 +1,135 @@
+:root {
+  --volcano-red: #9d311e;
+  --am-green: #037A68;
+}
+
+/* Layout for sidebar and main content */
+.compare-layout {
+  display: flex;
+  min-height: 100vh;
+}
+
+/* Sidebar styles */
+#driver-sidebar {
+  width: 320px;
+  min-width: 220px;
+  max-width: 350px;
+  padding: 2em 1em 1em 1em;
+  position: sticky;
+  top: 80px; /* adjust if your header is taller/shorter */
+  align-self: flex-start;
+  background: transparent !important; /* Transparent sidebar */
+  height: calc(100vh - 80px);
+  box-sizing: border-box;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 1em;
+  color: #fff;
+}
+
+/* Main content area */
+#compare-main {
+  flex: 1;
+  padding: 2em 4vw;
+  color: #fff;
+}
+
+/* Choices.js volcano-red customizations */
+.choices, .choices__inner, .choices__list--dropdown, .choices__list[aria-expanded], .choices__list--multiple, .choices__item {
+  background: none !important;
+  color: var(--volcano-red) !important;
+  border: none !important;
+}
+
+.choices__list--dropdown .choices__item--selectable,
+.choices__list--multiple .choices__item {
+  color: var(--volcano-red) !important;
+  background: none !important;
+  height: 100%;
+}
+
+.choices__input,
+.choices__input--cloned {
+  color: var(--volcano-red) !important;
+  background: none !important;
+}
+
+.choices__list--multiple .choices__item {
+  background: none !important;
+  color: var(--volcano-red) !important;
+  border: 1px solid var(--volcano-red) !important;
+}
+
+.choices__button {
+  color: var(--volcano-red) !important;
+  filter: none !important;
+  opacity: 1 !important;
+}
+
+.choices__button:hover {
+  color: #a31222 !important;
+}
+
+/* Selected drivers list */
+#selected-drivers h4 {
+  margin: 0 0 0.5em 0;
+  color: var(--volcano-red);
+}
+#selected-drivers ul {
+  margin: 0;
+  padding-left: 1em;
+  color: var(--volcano-red);
+}
+#selected-drivers li {
+  margin-bottom: 0.2em;
+}
+
+/* Responsive for sidebar layout */
+@media (max-width: 900px) {
+  .compare-layout {
+    flex-direction: column;
+  }
+  #driver-sidebar {
+    position: static;
+    width: 100%;
+    border-right: none;
+    border-bottom: 1px solid #eee;
+    height: auto;
+  }
+  #compare-main {
+    padding: 1em;
+  }
+}
+#season-slider{
+    accent-color: var(--volcano-red);
+}
+
+/* Custom scrollbar for Choices.js dropdown, using your volcano red */
+.choices__list--dropdown {
+  scrollbar-width: thin;
+  scrollbar-color: var(--volcano-red) transparent; /* thumb, track */
+  background: transparent !important; /* transparent dropdown background */
+}
+
+/* Webkit browsers (Chrome, Edge, Safari) */
+.choices__list--dropdown::-webkit-scrollbar {
+  width: 10px;
+  background: transparent;
+}
+
+.choices__list--dropdown::-webkit-scrollbar-thumb {
+  background: var(--volcano-red);
+  border-radius: 8px;
+  border: 2px solid transparent;
+}
+
+.choices__list--dropdown::-webkit-scrollbar-track {
+  background: transparent;
+  border-radius: 8px;
+}
+
+/* Optional: on hover, make thumb brighter */
+.choices__list--dropdown::-webkit-scrollbar-thumb:hover {
+  background: #ff3c3c;
+}
