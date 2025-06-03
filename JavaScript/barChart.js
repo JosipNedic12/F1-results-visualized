@@ -1,8 +1,6 @@
-// barChart.js
 import { getColorMap } from './utils.js';
 
 export function initBarChart({ circuits, constructors, results, colors, races }) {
-    // Prepare color map for constructors
     const colorMap = getColorMap(colors);
 
     // Build lookup maps for quick access
@@ -27,62 +25,66 @@ export function initBarChart({ circuits, constructors, results, colors, races })
         pointsByCircuit[circuitId][constructorId] += points;
     });
 
+    // Helper to get current quadrant size
+    function getChartSize() {
+        const parent = document.getElementById('top-right');
+        const rect = parent.getBoundingClientRect();
+        return {
+            width: rect.width > 0 ? rect.width : 700,
+            height: rect.height > 0 ? rect.height : 320
+        };
+    }
 
-    // Chart sizing and margins
-    const margin = { top: 40, right: 30, bottom: 80, left: 80 };
-    let chartWidth = 700, chartHeight = 320;
+    // Draw/update chart for a given circuit
+    function drawChart(circuitId) {
+        const { width: chartWidth, height: chartHeight } = getChartSize();
+        const margin = { top: 40, right: 30, bottom: 80, left: 80 };
+        const innerWidth = chartWidth - margin.left - margin.right;
+        const innerHeight = chartHeight - margin.top - margin.bottom;
 
-    // Create SVG if not already present
-    let svg = d3.select("#top-right").select("svg#chart-svg");
-    if (svg.empty()) {
-        svg = d3.select("#top-right")
+        // Remove old SVG and create new with right size
+        d3.select("#top-right").select("svg#chart-svg").remove();
+
+        let svg = d3.select("#top-right")
             .append("svg")
             .attr("id", "chart-svg")
             .attr("width", chartWidth)
             .attr("height", chartHeight);
-    }
-    svg.selectAll("*").remove(); // Clean for fresh drawing
 
-    const g = svg.append("g").attr("transform", `translate(${margin.left},${margin.top})`);
-    const innerWidth = chartWidth - margin.left - margin.right;
-    const innerHeight = chartHeight - margin.top - margin.bottom;
+        const g = svg.append("g").attr("transform", `translate(${margin.left},${margin.top})`);
 
-    // Axes groups
-    const xAxisG = g.append("g").attr("class", "x-axis").attr("transform", `translate(0,${innerHeight})`);
-    const yAxisG = g.append("g").attr("class", "y-axis");
+        // Axes groups
+        const xAxisG = g.append("g").attr("class", "x-axis").attr("transform", `translate(0,${innerHeight})`);
+        const yAxisG = g.append("g").attr("class", "y-axis");
 
-    // Title
-    const title = g.append("text")
-        .attr("class", "chart-title")
-        .attr("x", innerWidth / 2)
-        .attr("y", -15)
-        .attr("text-anchor", "middle")
-        .attr("font-size", "22px")
-        .attr("font-weight", "bold")
-        .text("");
+        // Title
+        const title = g.append("text")
+            .attr("class", "chart-title")
+            .attr("x", innerWidth / 2)
+            .attr("y", -15)
+            .attr("text-anchor", "middle")
+            .attr("font-size", "22px")
+            .attr("font-weight", "bold");
 
-    // Y label
-    g.append("text")
-        .attr("class", "y-label")
-        .attr("text-anchor", "middle")
-        .attr("transform", `translate(${-40},${innerHeight / 2})rotate(-90)`)
-        .attr("font-size", "14px")
-        .attr("font-weight", "bold")
-        .text("Points");
+        // Y label
+        g.append("text")
+            .attr("class", "y-label")
+            .attr("text-anchor", "middle")
+            .attr("transform", `translate(${-40},${innerHeight / 2})rotate(-90)`)
+            .attr("font-size", "14px")
+            .attr("font-weight", "bold")
+            .text("Points");
 
-    // X label
-    g.append("text")
-        .attr("class", "x-label")
-        .attr("text-anchor", "middle")
-        .attr("x", innerWidth / 2)
-        .attr("y", innerHeight + 60)
-        .attr("font-size", "14px")
-        .attr("font-weight", "bold")
-        .text("Constructor");
+        // X label
+        g.append("text")
+            .attr("class", "x-label")
+            .attr("text-anchor", "middle")
+            .attr("x", innerWidth / 2)
+            .attr("y", innerHeight + 60)
+            .attr("font-size", "14px")
+            .attr("font-weight", "bold")
+            .text("Constructor");
 
-
-    // Update function to redraw chart for a given circuit
-    function update(circuitId) {
         // Defensive: clear chart if circuitId invalid
         if (!pointsByCircuit[circuitId]) {
             g.selectAll(".bar,.label").remove();
@@ -116,75 +118,89 @@ export function initBarChart({ circuits, constructors, results, colors, races })
 
         // Axes
         xAxisG
-            .transition().duration(500)
             .call(d3.axisBottom(x))
             .selectAll("text")
             .attr("transform", "rotate(-15)")
             .style("text-anchor", "end");
 
         yAxisG
-            .transition().duration(500)
             .call(d3.axisLeft(y));
 
         // Bars
-        const bars = g.selectAll(".bar")
-            .data(data, d => d.name);
-
-        bars.enter()
-            .append("rect")
-            .attr("class", "bar")
-            .attr("x", d => x(d.name))
-            .attr("width", x.bandwidth())
-            .attr("y", innerHeight)
-            .attr("height", 0)
-            .attr("fill", d => colorMap[d.constructorId] || "#C83E4D")
-            .merge(bars)
-            .transition()
-            .duration(800)
-            .attr("x", d => x(d.name))
-            .attr("width", x.bandwidth())
-            .attr("y", d => y(d.points))
-            .attr("height", d => innerHeight - y(d.points))
-            .attr("fill", d => colorMap[d.constructorId] || "#C83E4D");
-
-        bars.exit()
-            .transition()
-            .duration(500)
-            .attr("y", innerHeight)
-            .attr("height", 0)
-            .remove();
+        g.selectAll(".bar")
+            .data(data, d => d.name)
+            .join(
+                enter => enter.append("rect")
+                    .attr("class", "bar")
+                    .attr("x", d => x(d.name))
+                    .attr("width", x.bandwidth())
+                    .attr("y", innerHeight)
+                    .attr("height", 0)
+                    .attr("fill", d => colorMap[d.constructorId] || "var(--volcano-red)")
+                    .call(enter => enter.transition()
+                        .duration(800)
+                        .attr("y", d => y(d.points))
+                        .attr("height", d => innerHeight - y(d.points))
+                    ),
+                update => update
+                    .transition()
+                    .duration(800)
+                    .attr("x", d => x(d.name))
+                    .attr("width", x.bandwidth())
+                    .attr("y", d => y(d.points))
+                    .attr("height", d => innerHeight - y(d.points))
+                    .attr("fill", d => colorMap[d.constructorId] || "var(--volcano-red)"),
+                exit => exit
+                    .transition()
+                    .duration(500)
+                    .attr("y", innerHeight)
+                    .attr("height", 0)
+                    .remove()
+            );
 
         // Labels
-        const labels = g.selectAll(".label")
-            .data(data, d => d.name);
-
-        labels.enter()
-            .append("text")
-            .attr("class", "label")
-            .attr("x", d => x(d.name) + x.bandwidth() / 2)
-            .attr("y", innerHeight)
-            .attr("text-anchor", "middle")
-            .attr("fill", "#222")
-            .attr("font-size", "14px")
-            .text(d => Math.round(d.points))
-            .merge(labels)
-            .transition()
-            .duration(800)
-            .attr("x", d => x(d.name) + x.bandwidth() / 2)
-            .attr("y", d => y(d.points) - 5)
-            .text(d => Math.round(d.points));
-
-        labels.exit()
-            .transition()
-            .duration(500)
-            .attr("y", innerHeight)
-            .remove();
+        g.selectAll(".label")
+            .data(data, d => d.name)
+            .join(
+                enter => enter.append("text")
+                    .attr("class", "label")
+                    .attr("x", d => x(d.name) + x.bandwidth() / 2)
+                    .attr("y", innerHeight)
+                    .attr("text-anchor", "middle")
+                    .attr("fill", "#222")
+                    .attr("font-size", "14px")
+                    .text(d => Math.round(d.points))
+                    .call(enter => enter.transition()
+                        .duration(800)
+                        .attr("y", d => y(d.points) - 5)
+                    ),
+                update => update
+                    .transition()
+                    .duration(800)
+                    .attr("x", d => x(d.name) + x.bandwidth() / 2)
+                    .attr("y", d => y(d.points) - 5)
+                    .text(d => Math.round(d.points)),
+                exit => exit
+                    .transition()
+                    .duration(500)
+                    .attr("y", innerHeight)
+                    .remove()
+            );
 
         // Title
         title.text(`Top Constructors at ${circuitName}`);
     }
 
     // Expose the update function for external calls
-    initBarChart.update = update;
+    initBarChart.update = function(circuitId) {
+        window.currentCircuitId = circuitId; // for resize
+        drawChart(circuitId);
+    };
 }
 
+// Redraw chart on window resize
+window.addEventListener('resize', () => {
+    if (initBarChart.update && window.currentCircuitId) {
+        initBarChart.update(window.currentCircuitId);
+    }
+});

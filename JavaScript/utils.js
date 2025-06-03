@@ -4,4 +4,4 @@ export function getColorMap(colors) {
   return colorMap;
 }
 
-// Add other utility functions as needed
+

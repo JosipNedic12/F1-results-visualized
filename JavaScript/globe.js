@@ -10,12 +10,11 @@ export function initGlobe({
     drivers,
     onCircuitSelected
 }) {
-    // --- Sizing ---
+
     const container = document.getElementById('globe-section');
     let width = container.clientWidth;
     let height = container.clientHeight;
 
-    // --- SVG & Projection ---
     const svg = d3.select("#globe-svg")
         .attr("width", width)
         .attr("height", height);
@@ -26,13 +25,13 @@ export function initGlobe({
 
     const path = d3.geoPath().projection(projection);
 
-    // --- Draw Sphere (Ocean) ---
+    //Draw Sphere Ocean
     svg.append("path")
         .attr("class", "sphere")
         .attr("fill", "#111")
         .attr("d", path({ type: "Sphere" }));
 
-    // --- Draw Graticule (Grid) ---
+    //Draw Grid
     const graticule = d3.geoGraticule10();
     svg.append("path")
         .attr("class", "graticule")
@@ -42,7 +41,7 @@ export function initGlobe({
         .attr("opacity", 0.5)
         .attr("d", path(graticule));
 
-    // --- Draw Land ---
+    //Draw Land
     svg.append("g")
         .selectAll("path")
         .data(geojson.features)
@@ -53,10 +52,9 @@ export function initGlobe({
         .attr("stroke-width", 0.5)
         .attr("d", path);
 
-    // --- Tooltip Setup ---
     const tooltip = d3.select("#tooltip");
 
-    // --- Draw Circuit Dots ---
+    //Draw Circuit Dots
     const circuitDots = svg.append("g")
         .attr("class", "circuits-group")
         .selectAll("circle")
@@ -97,9 +95,9 @@ export function initGlobe({
                 c.circuitId === d.circuitId ? "var(--am-green)" : "var(--volcano-red)"
             );
 
-            // --- Center and Zoom ---
+            //Center and Zoom
             const targetCoords = [+d.lng, +d.lat];
-            const rotate = [-targetCoords[0], -targetCoords[1]]; // center target
+            const rotate = [-targetCoords[0], -targetCoords[1]]; 
 
             d3.transition()
                 .duration(1000)
@@ -120,7 +118,7 @@ export function initGlobe({
     updateCircuits();
 
 
-    // --- Helper: Update Dot Positions (for drag/zoom/resize) ---
+    //Helper: Update Dot Positions
     function updateCircuits() {
         circuitDots.attr("transform", function (d) {
             const coords = projection([+d.lng, +d.lat]);
@@ -132,7 +130,7 @@ export function initGlobe({
         });
     }
 
-    // --- Drag to Rotate Globe ---
+    //Drag to Rotate Globe
     svg.call(d3.drag()
         .on("drag", (event) => {
             const rotate = projection.rotate();
@@ -148,7 +146,7 @@ export function initGlobe({
         })
     );
 
-    // --- Zoom to Scale Globe ---
+    //Zoom to Scale Globe
     svg.call(
         d3.zoom()
             .scaleExtent([0.5, 8])
@@ -161,7 +159,7 @@ export function initGlobe({
             })
     );
 
-    // --- Responsive Resize (for window or container size changes) ---
+    //Responsive Resize (for window or container size changes)
     function resizeGlobe() {
         width = container.clientWidth;
         height = container.clientHeight;
