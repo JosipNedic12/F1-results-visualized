@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <title>Compare Drivers | F1 Globe Dashboard</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="compare.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/choices.js/public/assets/styles/choices.min.css" />
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+</head>
+
+<body class="compare-page">
+    <div id="site-header">
+        <h1>Formula 1 results visualized</h1>
+        <nav>
+            <ul id="navbar">
+                <li><a href="index.html">Homepage</a></li>
+                <li><a href="compare.html" class="active">Compare Drivers</a></li>
+            </ul>
+        </nav>
+    </div>
+    <div class="container compare-layout">
+        <aside id="driver-sidebar">
+            <label for="driver-select" style="font-weight:bold;">Search and select drivers (max 10):</label>
+            <select id="driver-select" multiple size="50"></select>
+        </aside>
+
+        <main id="compare-main">
+            <div id="no-mutual-seasons"
+                style="display:none;color:var(--volcano-red);font-weight:bold;margin-bottom:1em;">
+                No Mutual seasons found
+            </div>
+            <div id="season-slider-row" style="margin-bottom: 1.5em;">
+                <label for="season-slider" style="font-weight:bold;">
+                    Season: <span id="season-value">1950</span>
+                </label>
+                <input type="range" id="season-slider" min="1950" max="2024" value="1950" step="1" style="width: 60%;">
+            </div>
+            <svg id="points-chart" width="900" height="500"></svg>
+            <svg id="race-count-chart" width="800" height="400"></svg>
+            <div id="selected-drivers"></div> <!-- MOVE HERE -->
+            <h2>Compare Drivers</h2>
+            <p style="color:#888;">(Chart and season slider will appear here in the next step.)</p>
+        </main>
+    </div>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/choices.js/public/assets/scripts/choices.min.js"></script>
+    <script type="module" src="JavaScript/compare.js"></script>
+    <script>
+        document.querySelectorAll('#navbar a').forEach(link => {
+            if (window.location.pathname.endsWith(link.getAttribute('href'))) {
+                link.classList.add('active');
+            }
+        });
+    </script>
+    <div id="points-tooltip" style="position:absolute; pointer-events:none; background:rgba(0,0,0,0.85); color:#fff; padding:6px 12px; border-radius:6px; font-size:15px; display:none; z-index:1000;"></div>
+</body>
+
+</html>
